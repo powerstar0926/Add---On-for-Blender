@@ -73,7 +73,7 @@ class OBJECT_OT_generate_models(bpy.types.Operator):
             self.report({'ERROR'}, "Please input prompt!")
             return {'CANCELLED'}
         
-        # # Check if any API key is empty
+        # Check if any API key is empty
         # if not props.api_key_1 or not props.api_key_2 or not props.api_key_3 or not props.api_key_4:
         #     self.report({'ERROR'}, "Please input all API Keys")
         #     props.status = "Generate"  # Reset to original status
@@ -93,10 +93,17 @@ class OBJECT_OT_generate_models(bpy.types.Operator):
         api_keys = [props.api_key_1, props.api_key_2, props.api_key_3, props.api_key_4]
 
         models = []
+        # For testing, only call API 1 twice
         models.append(self.call_api_1(api_keys[0], prompt))
-        models.append(self.call_api_2(api_keys[1], prompt))
-        models.append(self.call_api_3(api_keys[2], prompt))
-        models.append(self.call_api_4(api_keys[3], prompt))
+        models.append(self.call_api_1(api_keys[0], prompt))  # Call API 1 a second time
+
+        # Extend this to other APIs similarly
+        # models.append(self.call_api_2(api_keys[1], prompt))
+        # models.append(self.call_api_2(api_keys[1], prompt))
+        # models.append(self.call_api_3(api_keys[2], prompt))
+        # models.append(self.call_api_3(api_keys[2], prompt))
+        # models.append(self.call_api_4(api_keys[3], prompt))
+        # models.append(self.call_api_4(api_keys[3], prompt))
         
         bpy.app.invoke(self.models_generated, models)
 
@@ -113,44 +120,45 @@ class OBJECT_OT_generate_models(bpy.types.Operator):
         else:
             return None
 
-    def call_api_2(self, api_key, prompt):
-        url = "https://api2.example.com/generate"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        }
-        data = {"prompt": prompt}
-        response = requests.post(url, headers=headers, json=data)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            return None
+    # Example stubs for additional APIs
+    # def call_api_2(self, api_key, prompt):
+    #     url = "https://api2.example.com/generate"
+    #     headers = {
+    #         "Authorization": f"Bearer {api_key}",
+    #         "Content-Type": "application/json",
+    #     }
+    #     data = {"prompt": prompt}
+    #     response = requests.post(url, headers=headers, json=data)
+    #     if response.status_code == 200:
+    #         return response.json()
+    #     else:
+    #         return None
 
-    def call_api_3(self, api_key, prompt):
-        url = "https://api3.example.com/generate"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        }
-        data = {"prompt": prompt}
-        response = requests.post(url, headers=headers, json=data)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            return None
+    # def call_api_3(self, api_key, prompt):
+    #     url = "https://api3.example.com/generate"
+    #     headers = {
+    #         "Authorization": f"Bearer {api_key}",
+    #         "Content-Type": "application/json",
+    #     }
+    #     data = {"prompt": prompt}
+    #     response = requests.post(url, headers=headers, json=data)
+    #     if response.status_code == 200:
+    #         return response.json()
+    #     else:
+    #         return None
 
-    def call_api_4(self, api_key, prompt):
-        url = "https://api4.example.com/generate"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        }
-        data = {"prompt": prompt}
-        response = requests.post(url, headers=headers, json=data)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            return None
+    # def call_api_4(self, api_key, prompt):
+    #     url = "https://api4.example.com/generate"
+    #     headers = {
+    #         "Authorization": f"Bearer {api_key}",
+    #         "Content-Type": "application/json",
+    #     }
+    #     data = {"prompt": prompt}
+    #     response = requests.post(url, headers=headers, json=data)
+    #     if response.status_code == 200:
+    #         return response.json()
+    #     else:
+    #         return None
 
     def models_generated(self, context, models):
         props = context.scene.model_generator_props
@@ -163,7 +171,7 @@ class OBJECT_OT_generate_models(bpy.types.Operator):
         for idx, model in enumerate(models):
             iteration = props.iterations.add()
             iteration.iteration = idx + 1
-            iteration.source = f"API {idx + 1}"
+            iteration.source = f"API {idx // 2 + 1} - Model {idx % 2 + 1}"
 
         # Add code to handle the generated models
         print(models)
