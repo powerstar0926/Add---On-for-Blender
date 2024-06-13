@@ -69,6 +69,10 @@ class OBJECT_OT_generate_models(bpy.types.Operator):
     def execute(self, context):
         props = context.scene.model_generator_props
         
+        if not props.prompt:
+            self.report({'ERROR'}, "Please input prompt!")
+            return {'CANCELLED'}
+        
         # # Check if any API key is empty
         # if not props.api_key_1 or not props.api_key_2 or not props.api_key_3 or not props.api_key_4:
         #     self.report({'ERROR'}, "Please input all API Keys")
