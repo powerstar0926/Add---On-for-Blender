@@ -3,6 +3,7 @@ import threading
 from bpy.props import StringProperty, PointerProperty, IntProperty, CollectionProperty
 import time
 import requests
+import os
 
 class IterationItem(bpy.types.PropertyGroup):
     iteration: IntProperty(name="Iteration")
@@ -46,17 +47,14 @@ class OBJECT_PT_model_generator(bpy.types.Panel):
         
         row = layout.row()
         row.scale_y = 1.0
-        row.operator("object.generate_models", text=model_gen_props.status or "Generate", icon='PLAY')
 
+        # Update button text based on status
         if model_gen_props.status == "Generating...":
-            row = layout.row()
-            row.label(text="Generating...", icon='TIME')
-            self.animate_generate_button(row)
-
-    def animate_generate_button(self, row):
-        frame_current = int(time.time() * 2) % 8
-        icons = ['NONE', 'KEYFRAME', 'TIME', 'AUTO', 'RESTRICT_VIEW_ON']
-        row.label(icon=icons[frame_current])
+            row.operator("object.generate_models", text="Generating...", icon='TIME')
+        elif model_gen_props.status == "Completed":
+            row.operator("object.generate_models", text="Completed", icon='CHECKMARK')
+        else:
+            row.operator("object.generate_models", text="Generate", icon='PLAY')
 
 class OBJECT_OT_generate_models(bpy.types.Operator):
     bl_idname = "object.generate_models"
@@ -64,7 +62,7 @@ class OBJECT_OT_generate_models(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.scene.model_generator_props.status == ""
+        return context.scene.model_generator_props.status in ("", "Completed", "Failed")
 
     def execute(self, context):
         props = context.scene.model_generator_props
@@ -73,19 +71,9 @@ class OBJECT_OT_generate_models(bpy.types.Operator):
             self.report({'ERROR'}, "Please input prompt!")
             return {'CANCELLED'}
         
-        # Check if any API key is empty
-        # if not props.api_key_1 or not props.api_key_2 or not props.api_key_3 or not props.api_key_4:
-        #     self.report({'ERROR'}, "Please input all API Keys")
-        #     props.status = "Generate"  # Reset to original status
-        #     threading.Timer(5, self.reset_status, [context]).start()  # Reset after 5 seconds
-        #     return {'CANCELLED'}
-
         props.status = "Generating..."
         threading.Thread(target=self.generate_models, args=(context,)).start()
         return {'RUNNING_MODAL'}
-
-    def reset_status(self, context):
-        context.scene.model_generator_props.status = ""
 
     def generate_models(self, context):
         props = context.scene.model_generator_props
@@ -93,88 +81,108 @@ class OBJECT_OT_generate_models(bpy.types.Operator):
         api_keys = [props.api_key_1, props.api_key_2, props.api_key_3, props.api_key_4]
 
         models = []
-        # For testing, only call API 1 twice
-        models.append(self.call_api_1(api_keys[0], prompt))
-        models.append(self.call_api_1(api_keys[0], prompt))  # Call API 1 a second time
+        success = True
 
-        # Extend this to other APIs similarly
-        # models.append(self.call_api_2(api_keys[1], prompt))
-        # models.append(self.call_api_2(api_keys[1], prompt))
-        # models.append(self.call_api_3(api_keys[2], prompt))
-        # models.append(self.call_api_3(api_keys[2], prompt))
-        # models.append(self.call_api_4(api_keys[3], prompt))
-        # models.append(self.call_api_4(api_keys[3], prompt))
-        
-        bpy.app.invoke(self.models_generated, models)
+        # Call the API twice as per your logic
+        result_1 = self.call_api(api_keys[0], prompt)
+        result_2 = self.call_api(api_keys[0], prompt)
 
-    def call_api_1(self, api_key, prompt):
-        url = "https://api.meshy.ai/v1/text-to-texture"
+        if result_1 is not None:
+            models.append(result_1)
+        else:
+            success = False
+
+        if result_2 is not None:
+            models.append(result_2)
+        else:
+            success = False
+
+        bpy.app.timers.register(lambda: self.models_generated(context, models, success))
+
+    def call_api(self, api_key, prompt):
+        url = "https://api.meshy.ai/v2/text-to-3d"
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
-        data = {"prompt": prompt}
-        response = requests.post(url, headers=headers, json=data)
-        if response.status_code == 200:
-            return response.json()
-        else:
+        data = {
+            "mode": "preview",
+            "prompt": prompt,
+            "art_style": "realistic",
+            "negative_prompt": "low quality, low resolution, low poly, attractive"
+        }
+        try:
+            response = requests.post(url, headers=headers, json=data)
+            response.raise_for_status()
+            task_id = response.json().get('result')
+            if not task_id:
+                raise ValueError("No task ID returned in response")
+            
+            time.sleep(5)
+            
+            while True:
+                response = requests.get(f"https://api.meshy.ai/v1/text-to-texture/{task_id}", headers=headers)
+                response.raise_for_status()
+                result = response.json()
+                        
+                if result['status'] == 'SUCCEEDED':
+                    return result
+                elif result['status'] == 'FAILED':
+                    return None
+                else:
+                    time.sleep(10)
+
+        except requests.exceptions.HTTPError as err:
+            print(f"HTTP error occurred: {err}")
+        except Exception as err:
+            print(f"An error occurred: {err}")
+        return None
+
+    def download_model(self, model_url, filename):
+        """Download the model file from the provided URL and save it to the given filename."""
+        try:
+            response = requests.get(model_url)
+            response.raise_for_status()
+            with open(filename, 'wb') as file:
+                file.write(response.content)
+            return filename
+        except Exception as e:
+            print(f"Failed to download model: {e}")
             return None
 
-    # Example stubs for additional APIs
-    # def call_api_2(self, api_key, prompt):
-    #     url = "https://api2.example.com/generate"
-    #     headers = {
-    #         "Authorization": f"Bearer {api_key}",
-    #         "Content-Type": "application/json",
-    #     }
-    #     data = {"prompt": prompt}
-    #     response = requests.post(url, headers=headers, json=data)
-    #     if response.status_code == 200:
-    #         return response.json()
-    #     else:
-    #         return None
+    def import_model(self, filepath):
+        """Import the model into Blender based on the file extension."""
+        ext = os.path.splitext(filepath)[1].lower()
+        if ext == ".obj":
+            bpy.ops.import_scene.obj(filepath=filepath)
+        elif ext == ".fbx":
+            bpy.ops.import_scene.fbx(filepath=filepath)
+        # Add more import options as needed
+        else:
+            print(f"Unsupported file format: {ext}")
 
-    # def call_api_3(self, api_key, prompt):
-    #     url = "https://api3.example.com/generate"
-    #     headers = {
-    #         "Authorization": f"Bearer {api_key}",
-    #         "Content-Type": "application/json",
-    #     }
-    #     data = {"prompt": prompt}
-    #     response = requests.post(url, headers=headers, json=data)
-    #     if response.status_code == 200:
-    #         return response.json()
-    #     else:
-    #         return None
-
-    # def call_api_4(self, api_key, prompt):
-    #     url = "https://api4.example.com/generate"
-    #     headers = {
-    #         "Authorization": f"Bearer {api_key}",
-    #         "Content-Type": "application/json",
-    #     }
-    #     data = {"prompt": prompt}
-    #     response = requests.post(url, headers=headers, json=data)
-    #     if response.status_code == 200:
-    #         return response.json()
-    #     else:
-    #         return None
-
-    def models_generated(self, context, models):
+    def models_generated(self, context, models, success):
+        """Handle the generated models by downloading and importing them into Blender."""
         props = context.scene.model_generator_props
-        props.status = ""
+        props.status = "Completed" if success else "Failed"
 
-        # Clear previous iterations
         props.iterations.clear()
 
-        # Add new iterations to the property group
         for idx, model in enumerate(models):
             iteration = props.iterations.add()
             iteration.iteration = idx + 1
             iteration.source = f"API {idx // 2 + 1} - Model {idx % 2 + 1}"
+            
+            if model:
+                model_url = model['download_url']  # Adjust based on actual API response
+                # Save models in the current .blend file directory
+                filename = os.path.join(bpy.path.abspath("//"), f"model_{idx+1}.obj")
+                filepath = self.download_model(model_url, filename)
+                if filepath:
+                    self.import_model(filepath)
 
-        # Add code to handle the generated models
         print(models)
+        return None
 
 def register():
     bpy.utils.register_class(IterationItem)
