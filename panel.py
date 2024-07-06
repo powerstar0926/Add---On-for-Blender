@@ -85,17 +85,17 @@ class OBJECT_OT_generate_models(bpy.types.Operator):
 
         # Call the API twice as per your logic
         result_1 = self.call_api(api_keys[0], prompt)
-        result_2 = self.call_api(api_keys[0], prompt)
+        # result_2 = self.call_api(api_keys[0], prompt)
 
         if result_1 is not None:
             models.append(result_1)
         else:
             success = False
 
-        if result_2 is not None:
-            models.append(result_2)
-        else:
-            success = False
+        # if result_2 is not None:
+        #     models.append(result_2)
+        # else:
+        #     success = False
 
         bpy.app.timers.register(lambda: self.models_generated(context, models, success))
 
@@ -174,9 +174,9 @@ class OBJECT_OT_generate_models(bpy.types.Operator):
             iteration.source = f"API {idx // 2 + 1} - Model {idx % 2 + 1}"
             
             if model:
-                model_url = model['download_url']  # Adjust based on actual API response
+                model_url = model['model_urls']['fbx']  # Get the FBX model URL from the response
                 # Save models in the current .blend file directory
-                filename = os.path.join(bpy.path.abspath("//"), f"model_{idx+1}.obj")
+                filename = os.path.join(bpy.path.abspath("//"), f"model_{idx+1}.fbx")
                 filepath = self.download_model(model_url, filename)
                 if filepath:
                     self.import_model(filepath)

@@ -6,7 +6,7 @@ api_token = "msy_9a7pGswKXXAfouDj1PFIs6WgvAymPGzQp2Yk"
 # Step 1: Generate the task ID
 payload = {
     "mode": "preview",
-    "prompt": "the tiger",
+    "prompt": "the brown cute dog",
     "art_style": "realistic",
     "negative_prompt": "low quality, low resolution, low poly, attractive"
 }
